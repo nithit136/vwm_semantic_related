@@ -1,37 +1,4 @@
-/*
- * script.js
- *
- * This file contains the logic necessary to run the Visual Working Memory
- * experiment entirely within a web browser.  It mirrors the structure of the
- * provided PsychoPy code but is written in plain JavaScript and uses the DOM
- * to present stimuli and collect responses.  The experiment flows through the
- * following phases:
- *   1) Collect participant information via a simple form.
- *   2) Present instructions across three screens, advancing on Enter.
- *   3) For each of the 360 trials, display a fixation cross, a set of
- *      coloured object stimuli at variable positions for a specified encoding
- *      duration, a second fixation, and finally a four-alternative forced
- *      choice (4AFC) response screen.
- *   4) Record responses, reaction times, and accuracy.
- *   5) Save the resulting data as a downloadable JSON file and thank the
- *      participant.
- *
- * To use your own images, create a folder called `stimuli_folder` in the
- * experiment directory containing subfolders named `size2`, `size4` and
- * `size6`.  Within each size folder create subfolders for each category
- * (e.g. `cat_1`, `cat_2`, ..., `cat_10`) and place your image files there
- * using the naming convention `objX_sY.jpg` (e.g. `obj1_s1.jpg`).  Two
- * instruction images named `instr1.png` and `instr2.png` should also be
- * placed in the experiment directory.
- */
 
-(() => {
-  // Helper functions for randomisation and combinatorial logic
-  /**
-   * Shuffle an array in place using the Fisher–Yates algorithm.
-   * @param {Array} array The array to shuffle
-   * @returns {Array} The shuffled array
-   */
   function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -39,13 +6,6 @@
     }
     return array;
   }
-
-  /**
-   * Generate all permutations of length k from the elements of arr.
-   * @param {Array} arr Source array
-   * @param {number} k Length of each permutation
-   * @returns {Array<Array>} List of permutations
-   */
   function permutations(arr, k) {
     const results = [];
     function helper(current, remaining) {
@@ -63,12 +23,7 @@
     return results;
   }
 
-  /**
-   * Generate all k-combinations of the elements of arr.
-   * @param {Array} arr Source array
-   * @param {number} k Number of elements per combination
-   * @returns {Array<Array>} List of combinations
-   */
+
   function combinations(arr, k) {
     const results = [];
     function combine(start, combo) {
@@ -86,12 +41,6 @@
     return results;
   }
 
-  /**
-   * Generate all combinations of 's1' and 's2' repeated n times.
-   * Equivalent to computing a Cartesian product of length n.
-   * @param {number} n Number of elements in each state sequence
-   * @returns {Array<Array>} List of state combinations
-   */
   function getStates(n) {
     const results = [];
     function helper(prefix, depth) {
@@ -109,14 +58,6 @@
     return results;
   }
 
-  /**
-   * Create combos for unrelated conditions.  Given a fixed category and
-   * the number of additional categories to select, returns 12 randomly
-   * selected combinations, each beginning with the fixed category.
-   * @param {string} fixedCat The fixed category
-   * @param {number} nCombo Number of other categories to choose
-   * @returns {Array<Array>} A list of category combinations
-   */
   function makeCombos(fixedCat, nCombo, categories) {
     const others = categories.filter(c => c !== fixedCat);
     const allCombos = combinations(others, nCombo);
@@ -125,14 +66,7 @@
     return selected.map(c => [fixedCat, ...c]);
   }
 
-  /**
-   * Generate foil categories for the two-alternative 4AFC task.  For each
-   * selection of categories, choose one foil category that is not present
-   * in the selection and return a pair [targetCat, foilCat].
-   * @param {Array<Array>} selectedCat List of category selections
-   * @param {Array<string>} categories Master list of all categories
-   * @returns {Array<Array>} A list of [targetCat, foilCat] pairs
-   */
+
   function makeAfcCat(selectedCat, categories) {
     const afcCat = [];
     for (const c of selectedCat) {
@@ -144,31 +78,7 @@
     return afcCat;
   }
 
-  /**
-   * Precompute all stimuli and associated metadata for each set size,
-   * context and category.  This mirrors the logic in the original PsychoPy
-   * script.  The resulting structure is stored on the global `stimulusDict`
-   * variable for later lookup.
-   *
-   * stimulusDict has the following structure:
-   * {
-   *   size2: {
-   *     related: {
-   *       cat_1: {
-   *         category: [[cat_1, cat_1], ..., 12 entries],
-   *         stimulus: [[obj1, obj2], ..., 12 entries],
-   *         state: [[s1, s2], ..., 12 entries],
-   *         afc_cat: [[cat_1, foil], ..., 12 entries],
-   *         afc_stim: [[objA, objB], ..., 12 entries]
-   *       },
-   *       ...
-   *     },
-   *     unrelated: { ... },
-   *   },
-   *   size4: { ... },
-   *   size6: { ... }
-   * }
-   */
+
   function buildStimulusDict() {
     const stimulusDict = {};
     // General parameters
@@ -377,14 +287,7 @@
     return stimulusDict;
   }
 
-  /**
-   * Create a download link for the given JSON data and display it in the
-   * experiment container.  When clicked, the file will be saved to the
-   * user's machine.  Optionally triggers an automatic click to start the
-   * download immediately.
-   * @param {Object} data The data object to convert to JSON
-   * @param {string} filename Name of the file to download
-   */
+
   function createDownloadLink(data, filename) {
     const jsonStr = JSON.stringify(data, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -400,12 +303,6 @@
   }
 
 
-  /**
-   * Wait for the user to press one of the specified keys.  Returns a
-   * promise that resolves with the pressed key.
-   * @param {Array<string>} keys List of allowed key identifiers
-   * @returns {Promise<string>} Promise that resolves with the key pressed
-   */
   function waitForKey(keys) {
     return new Promise(resolve => {
       function handleKey(event) {
@@ -419,11 +316,6 @@
     });
   }
 
-  /**
-   * Pause execution for a specified duration.
-   * @param {number} ms Milliseconds to wait
-   * @returns {Promise<void>} Promise that resolves after the delay
-   */
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -482,11 +374,7 @@
     }
   };
 
-  /**
-   * Display the demographic form asking for participant number and age.
-   * Once the participant clicks start and the inputs are valid, the
-   * experiment proceeds to the instruction screens.
-   */
+
   function showDemographicForm() {
     const container = document.getElementById('experiment');
     container.innerHTML = '';
@@ -524,11 +412,7 @@
     container.appendChild(formDiv);
   }
 
-  /**
-   * Sequentially present the three instruction screens.  Each screen
-   * waits for the participant to press the Enter key before moving on.
-   * After the final screen, the main experiment trials begin.
-   */
+
   async function showInstructions() {
     const container = document.getElementById('experiment');
     container.innerHTML = '';
@@ -553,7 +437,7 @@
     instr2.style.maxWidth = '800px';
 
     const img1 = document.createElement('img');
-    img1.src = '/Users/bank/Desktop/vwm/vwm_task_bank/instr1.png';
+    img1.src = 'instr1.png';
     img1.style.maxWidth = '80%';
     img1.style.height = 'auto';
     img1.style.display = 'block';
@@ -580,7 +464,7 @@
 
     
     const img2 = document.createElement('img');
-    img2.src = '/Users/bank/Desktop/vwm/vwm_task_bank/instr2.png';
+    img2.src = 'instr2.png';
     img2.style.maxWidth = '80%';
     img2.style.height = 'auto';
     img2.style.display = 'block';
@@ -595,16 +479,7 @@
     await runTrials();
   }
 
-  /**
-   * Compute pixel positions for stimuli based on set size and randomised
-   * ordering.  The returned array contains objects with CSS percentage
-   * values for top and left so that elements can be positioned using
-   * absolute positioning.  This uses the same relative offsets as the
-   * PsychoPy script but scales them to the current viewport.
-   * @param {string} ss The set size (e.g. 'size2')
-   * @param {Array<number>} order Array of indices indicating the random order
-   * @returns {Array<{top: string, left: string}>} Positions for each stimulus
-   */
+
   function computePositions(ss, order) {
     const positions = [];
     const w = window.innerWidth;
@@ -641,11 +516,7 @@
     return positions;
   }
 
-  /**
-   * Compute positions for the 4AFC images.  Returns an array of CSS
-   * positions matching the four quadrants defined in the original code.
-   * @returns {Array<{top: string, left: string}>} Positions for the 4AFC
-   */
+
   function computeAfcPositions() {
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -662,13 +533,7 @@
     });
   }
 
-  /**
-   * Run through all trials sequentially.  For each trial a fixation cross
-   * is shown, then the stimuli are presented for the encoding duration,
-   * followed by another fixation and then a 4AFC response screen.  Results
-   * are recorded into the global `p` object.  When all trials complete
-   * the finish screen is displayed.
-   */
+
   async function runTrials() {
     const container = document.getElementById('experiment');
     // Precompute AFC positions once
@@ -733,7 +598,7 @@
       for (let j = 0; j < nStim; j++) {
         const img = document.createElement('img');
         img.className = 'stimulus-img';
-        img.src = `/Users/bank/Desktop/vwm/stimuli_folder/${ss}/${stimuliPaths[j]}.jpg`;
+        img.src = `stimuli_folder/${ss}/${stimuliPaths[j]}.jpg`;
         // Set size relative to number of stimuli
         let widthPerc = 20;
         if (ss === 'size2') widthPerc = 20;
@@ -790,7 +655,7 @@
       const afcDivs = [];
       for (let pos = 0; pos < 4; pos++) {
         const stimType = afcOrder[pos];
-        const stimPath = `/Users/bank/Desktop/vwm/stimuli_folder/${ss}/${afcStimuli[stimType]}.jpg`;
+        const stimPath = `stimuli_folder/${ss}/${afcStimuli[stimType]}.jpg`;
         // Image
         const img = document.createElement('img');
         img.className = 'afc-img';
@@ -860,12 +725,7 @@
     finishExperiment(false);
   }
 
-  /**
-   * Display a thank you message and provide a download link for the data.
-   * Optionally skip the thank you if the experiment was aborted (e.g. via
-   * the Escape key).
-   * @param {boolean} aborted Whether the experiment ended prematurely
-   */
+
   function finishExperiment(aborted) {
     const container = document.getElementById('experiment');
     container.innerHTML = '';
@@ -879,8 +739,6 @@
     }
   }
 
-  // Initialise the experiment by showing the demographic form when the
-  // page loads.
   window.addEventListener('load', () => {
     showDemographicForm();
   });
