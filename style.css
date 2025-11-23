@@ -1,0 +1,103 @@
+/*
+ * Global styles for the Visual Working Memory experiment.  The page is kept
+ * deliberately clean and minimal to avoid distracting participants.  All
+ * dynamic layout is handled via inline styles computed in script.js, but
+ * some baseline rules are set here to ensure consistent appearance across
+ * browsers.
+ */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  color: #000000;
+  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Container that holds all experimental elements */
+#experiment {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Cross fixation symbol */
+.fixation {
+  font-size: 4rem;
+  line-height: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Instructions text */
+.instructions {
+  max-width: 80%;
+  margin: auto;
+  font-size: 1.2rem;
+  line-height: 1.5;
+}
+
+/* Buttons and form inputs */
+.form-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.form-container input[type="text"],
+.form-container input[type="number"] {
+  padding: 0.5rem;
+  font-size: 1rem;
+  width: 200px;
+}
+
+.form-container button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+/* Stimulus images */
+.stimulus-img {
+  position: absolute;
+  width: 10%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* 4AFC images container */
+.afc-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.afc-img {
+  position: absolute;
+  width: 15%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Key labels under 4AFC images */
+.afc-label {
+  position: absolute;
+  font-size: 1rem;
+  color: #000;
+}
+
+/* Thank you screen */
+.thank-you {
+  font-size: 2rem;
+  font-weight: bold;
+}
