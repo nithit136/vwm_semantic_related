@@ -655,6 +655,7 @@
       context: [],
       id: [],
       category: [],
+      stimuli_category = [],
       obj: [],
       state: [],
       stimulus_loc: [],
@@ -873,7 +874,7 @@
       // on each trial, especially in unrelated conditions where multiple
       // categories can appear.  We push a shallow copy of the array to
       // avoid unintended mutations when the original array is reused.
-      p.task.id.push(stimCategory.slice());
+      
       // Determine chosen objects and states
       let chosenObj = [];
       let chosenState = [];
@@ -890,6 +891,7 @@
       // Save objects and states
       p.task.obj.push(chosenObj.slice());
       p.task.state.push(chosenState.slice());
+      p.task.stimuli_category.push(stimCategory.slice());
       // Compute file names for each stimulus
       const stimuliPaths = [];
       for (let j = 0; j < chosenObj.length; j++) {
