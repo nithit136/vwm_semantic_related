@@ -26,11 +26,6 @@
  */
 
 (() => {
-  // Cache object used by the image preloader.  Each key is an image
-  // path and the corresponding value is a loaded Image object.  By
-  // storing references here, the browser keeps the resources in
-  // memory, avoiding additional network requests during the task.
-  const IMAGE_CACHE = {};
   // Helper functions for randomisation and combinatorial logic
   /**
    * Shuffle an array in place using the Fisher–Yates algorithm.
@@ -189,98 +184,6 @@
     for (let i = 0; i < 3; i++) {
       ss2State.push(...ss2Base.map(s => s.slice()));
     }
-
-  /**
-   * Build a flat list of all image paths used in the experiment.  This
-   * includes every possible stimulus image (across all set sizes,
-   * categories, objects and states) as well as the instruction images.
-   * These paths are used by the image preloader so that every image can
-   * be fetched and cached before the experiment starts.  Having images
-   * loaded up front avoids missing or delayed stimuli when trials run.
-   *
-   * @returns {Array<string>} List of relative image paths
-   */
-  function buildAllImagePaths() {
-    const paths = [];
-    // Define set sizes and corresponding objects; this mirrors the
-    // structure used when computing the stimulus dictionary.  Note that
-    // size4 uses the same objects as size2 in this particular task.
-    const setSizes = ['size2', 'size4', 'size6'];
-    const objectsBySet = {
-      size2: ['obj1', 'obj2', 'obj3', 'obj4'],
-      size4: ['obj1', 'obj2', 'obj3', 'obj4'],
-      size6: ['obj1', 'obj2', 'obj3', 'obj4', 'obj5', 'obj6']
-    };
-    const states = ['s1', 's2'];
-    // Use the global categoriesList defined below.  This ensures that
-    // modifications to the category list propagate to the preloader.
-    setSizes.forEach(ss => {
-      const objs = objectsBySet[ss];
-      categoriesList.forEach(cat => {
-        objs.forEach(obj => {
-          states.forEach(st => {
-            const relPath = `stimuli_folder/${ss}/${cat}/${obj}_${st}.jpg`;
-            paths.push(relPath);
-          });
-        });
-      });
-    });
-    // Also include the instruction images which are referenced in the
-    // instruction screens.  These files should live alongside index.html.
-    paths.push('instr1.png');
-    paths.push('instr2.png');
-    return paths;
-  }
-
-  /**
-   * Preload all experiment images before the task begins.  Given a list
-   * of image paths, this function creates Image objects, assigns each
-   * path to the src attribute, and resolves a promise when all images
-   * have either loaded or failed.  Successfully loaded images are
-   * stored on the IMAGE_CACHE object for potential later reuse.
-   *
-   * An optional callback can be supplied to monitor progress.  It is
-   * invoked with (loadedCount, totalCount, path, success) each time an
-   * image finishes loading (or fails).  This can be used to update a
-   * progress indicator on screen if desired.
-   *
-   * @param {Function} updateProgressCallback Optional progress callback
-   * @returns {Promise<{failed: Array<string>}>} Resolves when all images are attempted
-   */
-  function preloadImages() {
-    const paths = buildAllImagePaths();
-    const total = paths.length;
-    let loadedCount = 0;
-    const failed = [];
-    return new Promise(resolve => {
-      paths.forEach(path => {
-        const img = new Image();
-        img.onload = () => {
-          // Cache the image using the relative path as key
-          IMAGE_CACHE[path] = img;
-          loadedCount++;
-          if (updateProgressCallback) {
-            updateProgressCallback(loadedCount, total, path, true);
-          }
-          if (loadedCount === total) {
-            resolve({ failed });
-          }
-        };
-        img.onerror = () => {
-          console.warn('Failed to preload image:', path);
-          failed.push(path);
-          loadedCount++;
-          if (updateProgressCallback) {
-            updateProgressCallback(loadedCount, total, path, false);
-          }
-          if (loadedCount === total) {
-            resolve({ failed });
-          }
-        };
-        img.src = path;
-      });
-    });
-  }
     const ss4State = getStates(4);
     const ss6State = getStates(6);
     // Precompute permutations for related size2 (4P2 = 12)
@@ -474,97 +377,6 @@
     return stimulusDict;
   }
 
-  // ---------------------------------------------------------------------------
-  // Preloading utilities
-  // The following functions are defined outside of buildStimulusDict so they
-  // can be referenced from elsewhere in the script (e.g. showInstructions).
-  // Duplicate definitions exist inside buildStimulusDict for legacy reasons,
-  // but those are scoped locally and do not affect the global behaviour.
-
-  /**
-   * Build a flat list of all image paths used in the experiment.  This
-   * includes every possible stimulus image (across all set sizes,
-   * categories, objects and states) as well as the instruction images.
-   * These paths are used by the image preloader so that every image can
-   * be fetched and cached before the experiment starts.  Having images
-   * loaded up front avoids missing or delayed stimuli when trials run.
-   *
-   * @returns {Array<string>} List of relative image paths
-   */
-  function buildAllImagePaths() {
-    const paths = [];
-    const setSizes = ['size2', 'size4', 'size6'];
-    const objectsBySet = {
-      size2: ['obj1', 'obj2', 'obj3', 'obj4'],
-      size4: ['obj1', 'obj2', 'obj3', 'obj4'],
-      size6: ['obj1', 'obj2', 'obj3', 'obj4', 'obj5', 'obj6']
-    };
-    const states = ['s1', 's2'];
-    setSizes.forEach(ss => {
-      const objs = objectsBySet[ss];
-      categoriesList.forEach(cat => {
-        objs.forEach(obj => {
-          states.forEach(st => {
-            const relPath = `stimuli_folder/${ss}/${cat}/${obj}_${st}.jpg`;
-            paths.push(relPath);
-          });
-        });
-      });
-    });
-    paths.push('instr1.png');
-    paths.push('instr2.png');
-    return paths;
-  }
-
-  /**
-   * Preload all experiment images before the task begins.  Given a list
-   * of image paths, this function creates Image objects, assigns each
-   * path to the src attribute, and resolves a promise when all images
-   * have either loaded or failed.  Successfully loaded images are
-   * stored on the IMAGE_CACHE object for potential later reuse.
-   *
-   * An optional callback can be supplied to monitor progress.  It is
-   * invoked with (loadedCount, totalCount, path, success) each time an
-   * image finishes loading (or fails).  This can be used to update a
-   * progress indicator on screen if desired.
-   *
-   * @param {Function} updateProgressCallback Optional progress callback
-   * @returns {Promise<{failed: Array<string>}>} Resolves when all images are attempted
-   */
-  function preloadImages(updateProgressCallback) {
-    const paths = buildAllImagePaths();
-    const total = paths.length;
-    let loadedCount = 0;
-    const failed = [];
-    return new Promise(resolve => {
-      paths.forEach(path => {
-        const img = new Image();
-        img.onload = () => {
-          IMAGE_CACHE[path] = img;
-          loadedCount++;
-          if (updateProgressCallback) {
-            updateProgressCallback(loadedCount, total, path, true);
-          }
-          if (loadedCount === total) {
-            resolve({ failed });
-          }
-        };
-        img.onerror = () => {
-          console.warn('Failed to preload image:', path);
-          failed.push(path);
-          loadedCount++;
-          if (updateProgressCallback) {
-            updateProgressCallback(loadedCount, total, path, false);
-          }
-          if (loadedCount === total) {
-            resolve({ failed });
-          }
-        };
-        img.src = path;
-      });
-    });
-  }
-
   /**
    * Create a download link for the given JSON data and display it in the
    * experiment container.  When clicked, the file will be saved to the
@@ -583,8 +395,10 @@
     link.textContent = 'Download results';
     link.style.display = 'block';
     link.style.marginTop = '20px';
+    link.click();
     document.getElementById('experiment').appendChild(link);
   }
+
 
   /**
    * Wait for the user to press one of the specified keys.  Returns a
@@ -655,6 +469,7 @@
       context: [],
       id: [],
       category: [],
+      stimuli_category: [],
       obj: [],
       state: [],
       stimulus_loc: [],
@@ -718,56 +533,60 @@
   async function showInstructions() {
     const container = document.getElementById('experiment');
     container.innerHTML = '';
-    // Before showing any instructions we preload all images.  This
-    // prevents network latency or caching issues from interrupting the
-    // presentation of stimuli during the experiment.  Display a
-    // temporary loading message while the images are being fetched.
-    const loadingDiv = document.createElement('div');
-    loadingDiv.className = 'loading';
-    loadingDiv.textContent = 'Loading images, please wait...';
-    container.appendChild(loadingDiv);
-    // Await completion of the preloader.  If desired you could
-    // implement a progress bar by passing a callback to preloadImages.
-    await preloadImages();
-    // Once preloading is complete, clear the loading message.
-    container.innerHTML = '';
     // Instruction 1
     const instr1 = document.createElement('div');
     instr1.className = 'instructions';
     instr1.innerHTML = `This is a visual working memory task. This task will take approximately 30–40 minutes. You will have to remember the objects and report which one was shown in the previous set of objects as accurately as possible.<br><br>Press Enter to continue.`;
     container.appendChild(instr1);
     await waitForKey(['Enter', 'Return']);
+
     // Instruction 2 with image
     container.innerHTML = '';
     const instr2 = document.createElement('div');
     instr2.className = 'instructions';
-    instr2.innerHTML = `First, you will briefly see a set of objects. Please remember all of the objects.`;
+    instr2.innerHTML = `First, you will briefly see a set of objects. Please remember all of the objects.<br><br>Press Enter to continue.`;
+    instr2.style.position = 'absolute';
+    instr2.style.top = '50px';
+    instr2.style.left = '50%';
+    instr2.style.transform = 'translateX(-50%)';
+    instr2.style.textAlign = 'center';
+    instr2.style.width = '100%';
+    instr2.style.maxWidth = '800px';
+
     const img1 = document.createElement('img');
-    img1.src = 'instr1.png';
+    img1.src = '/Users/bank/Desktop/vwm/vwm_task_bank/instr1.png';
     img1.style.maxWidth = '80%';
     img1.style.height = 'auto';
     img1.style.display = 'block';
     img1.style.margin = '20px auto';
     const prompt1 = document.createElement('div');
-    prompt1.textContent = 'Press Enter to continue';
     prompt1.style.marginTop = '20px';
     container.appendChild(instr2);
     container.appendChild(img1);
     container.appendChild(prompt1);
     await waitForKey(['Enter', 'Return']);
+    
     // Instruction 3 with second image
     container.innerHTML = '';
     const instr3 = document.createElement('div');
     instr3.className = 'instructions';
-    instr3.innerHTML = `Next, you will have to choose which object was shown in the previous set of objects.`;
+    instr3.innerHTML = `Next, you will have to choose which object was shown in the previous set of objects.<br><br>Press Enter to start the task.`;
+    instr3.style.position = 'absolute';
+    instr3.style.top = '50px';
+    instr3.style.left = '50%';
+    instr3.style.transform = 'translateX(-50%)';
+    instr3.style.textAlign = 'center';
+    instr3.style.width = '100%';
+    instr3.style.maxWidth = '800px';
+
+    
     const img2 = document.createElement('img');
-    img2.src = 'instr2.png';
+    img2.src = '/Users/bank/Desktop/vwm/vwm_task_bank/instr2.png';
     img2.style.maxWidth = '80%';
     img2.style.height = 'auto';
     img2.style.display = 'block';
     img2.style.margin = '20px auto';
     const prompt2 = document.createElement('div');
-    prompt2.textContent = 'Press Enter to start the task';
     prompt2.style.marginTop = '20px';
     container.appendChild(instr3);
     container.appendChild(img2);
@@ -855,7 +674,8 @@
     const container = document.getElementById('experiment');
     // Precompute AFC positions once
     const afcPositions = computeAfcPositions();
-    for (let i = 0; i < conditions.length; i++) {
+    for (let i = 0; i < 10; i++) {
+    // for (let i = 0; i < conditions.length; i++) {
       const [ss, et, ctx, cat] = conditions[i];
       const id = randId[i];
       // Store trial metadata
@@ -865,15 +685,7 @@
       p.task.encoding_time.push(et);
       p.task.context.push(ctx);
       p.task.category.push(cat);
-      // Instead of storing only the numeric id for each trial, we also
-      // record the actual stimulus categories used.  The stimCategory
-      // variable contains the category (or categories) associated with
-      // each stimulus in the current trial.  Storing this array allows
-      // downstream analyses to recover which categories were presented
-      // on each trial, especially in unrelated conditions where multiple
-      // categories can appear.  We push a shallow copy of the array to
-      // avoid unintended mutations when the original array is reused.
-      p.task.id.push(stimCategory.slice());
+      p.task.id.push(id);
       // Determine chosen objects and states
       let chosenObj = [];
       let chosenState = [];
@@ -890,6 +702,7 @@
       // Save objects and states
       p.task.obj.push(chosenObj.slice());
       p.task.state.push(chosenState.slice());
+      p.task.stimuli_category.push(stimCategory.slice());
       // Compute file names for each stimulus
       const stimuliPaths = [];
       for (let j = 0; j < chosenObj.length; j++) {
@@ -911,12 +724,18 @@
       container.appendChild(fix);
       await sleep(1000);
       // Phase 2: show stimuli
+
       container.innerHTML = '';
+      const fix3 = document.createElement('div');
+      fix3.className = 'fixation';
+      fix3.textContent = '+';
+      container.appendChild(fix3);
+
       const stimElems = [];
       for (let j = 0; j < nStim; j++) {
         const img = document.createElement('img');
         img.className = 'stimulus-img';
-        img.src = `stimuli_folder/${ss}/${stimuliPaths[j]}.jpg`;
+        img.src = `/Users/bank/Desktop/vwm/stimuli_folder/${ss}/${stimuliPaths[j]}.jpg`;
         // Set size relative to number of stimuli
         let widthPerc = 20;
         if (ss === 'size2') widthPerc = 20;
@@ -973,7 +792,7 @@
       const afcDivs = [];
       for (let pos = 0; pos < 4; pos++) {
         const stimType = afcOrder[pos];
-        const stimPath = `stimuli_folder/${ss}/${afcStimuli[stimType]}.jpg`;
+        const stimPath = `/Users/bank/Desktop/vwm/stimuli_folder/${ss}/${afcStimuli[stimType]}.jpg`;
         // Image
         const img = document.createElement('img');
         img.className = 'afc-img';
@@ -987,9 +806,10 @@
         label.className = 'afc-label';
         label.textContent = `Press ${keyMap[pos]}`;
         label.style.left = afcPositions[pos].left;
+        
         // Place label slightly below the image
         const offsetY = parseFloat(afcPositions[pos].top);
-        label.style.top = `${offsetY + 6}%`;
+        label.style.top = `${offsetY + 20}%`;
         label.style.transform = 'translate(-50%, -50%)';
         container.appendChild(label);
         afcDivs.push({ img, label });
