@@ -1,4 +1,12 @@
 (() => {
+
+  const IMAGE_CACHE = {};
+  // Helper functions for randomisation and combinatorial logic
+  /**
+   * Shuffle an array in place using the Fisher–Yates algorithm.
+   * @param {Array} array The array to shuffle
+   * @returns {Array} The shuffled array
+   */
   function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -6,6 +14,13 @@
     }
     return array;
   }
+
+  /**
+   * Generate all permutations of length k from the elements of arr.
+   * @param {Array} arr Source array
+   * @param {number} k Length of each permutation
+   * @returns {Array<Array>} List of permutations
+   */
   function permutations(arr, k) {
     const results = [];
     function helper(current, remaining) {
@@ -23,7 +38,12 @@
     return results;
   }
 
-
+  /**
+   * Generate all k-combinations of the elements of arr.
+   * @param {Array} arr Source array
+   * @param {number} k Number of elements per combination
+   * @returns {Array<Array>} List of combinations
+   */
   function combinations(arr, k) {
     const results = [];
     function combine(start, combo) {
@@ -41,6 +61,12 @@
     return results;
   }
 
+  /**
+   * Generate all combinations of 's1' and 's2' repeated n times.
+   * Equivalent to computing a Cartesian product of length n.
+   * @param {number} n Number of elements in each state sequence
+   * @returns {Array<Array>} List of state combinations
+   */
   function getStates(n) {
     const results = [];
     function helper(prefix, depth) {
@@ -58,6 +84,14 @@
     return results;
   }
 
+  /**
+   * Create combos for unrelated conditions.  Given a fixed category and
+   * the number of additional categories to select, returns 12 randomly
+   * selected combinations, each beginning with the fixed category.
+   * @param {string} fixedCat The fixed category
+   * @param {number} nCombo Number of other categories to choose
+   * @returns {Array<Array>} A list of category combinations
+   */
   function makeCombos(fixedCat, nCombo, categories) {
     const others = categories.filter(c => c !== fixedCat);
     const allCombos = combinations(others, nCombo);
@@ -66,7 +100,14 @@
     return selected.map(c => [fixedCat, ...c]);
   }
 
-
+  /**
+   * Generate foil categories for the two-alternative 4AFC task.  For each
+   * selection of categories, choose one foil category that is not present
+   * in the selection and return a pair [targetCat, foilCat].
+   * @param {Array<Array>} selectedCat List of category selections
+   * @param {Array<string>} categories Master list of all categories
+   * @returns {Array<Array>} A list of [targetCat, foilCat] pairs
+   */
   function makeAfcCat(selectedCat, categories) {
     const afcCat = [];
     for (const c of selectedCat) {
@@ -94,6 +135,86 @@
     for (let i = 0; i < 3; i++) {
       ss2State.push(...ss2Base.map(s => s.slice()));
     }
+
+  /**
+   * Build a flat list of all image paths used in the experiment.  This
+   * includes every possible stimulus image (across all set sizes,
+   * categories, objects and states) as well as the instruction images.
+   * These paths are used by the image preloader so that every image can
+   * be fetched and cached before the experiment starts.  Having images
+   * loaded up front avoids missing or delayed stimuli when trials run.
+   *
+   * @returns {Array<string>} List of relative image paths
+   */
+  function buildAllImagePaths() {
+    const paths = [];
+
+    const setSizes = ['size2', 'size4', 'size6'];
+    const objectsBySet = {
+      size2: ['obj1', 'obj2', 'obj3', 'obj4'],
+      size4: ['obj1', 'obj2', 'obj3', 'obj4'],
+      size6: ['obj1', 'obj2', 'obj3', 'obj4', 'obj5', 'obj6']
+    };
+    const states = ['s1', 's2'];
+    // Use the global categoriesList defined below.  This ensures that
+    // modifications to the category list propagate to the preloader.
+    setSizes.forEach(ss => {
+      const objs = objectsBySet[ss];
+      categoriesList.forEach(cat => {
+        objs.forEach(obj => {
+          states.forEach(st => {
+            const relPath = `stimuli_folder/${ss}/${cat}/${obj}_${st}.jpg`;
+            paths.push(relPath);
+          });
+        });
+      });
+    });
+
+    paths.push('instr1.png');
+    paths.push('instr2.png');
+    return paths;
+  }
+
+  /**
+
+   *
+   * @param {Function} updateProgressCallback Optional progress callback
+   * @returns {Promise<{failed: Array<string>}>} Resolves when all images are attempted
+   */
+  function preloadImages(updateProgressCallback) {
+    const paths = buildAllImagePaths();
+    const total = paths.length;
+    let loadedCount = 0;
+    const failed = [];
+    return new Promise(resolve => {
+      paths.forEach(path => {
+        const img = new Image();
+        img.onload = () => {
+          // Cache the image using the relative path as key
+          IMAGE_CACHE[path] = img;
+          loadedCount++;
+          if (updateProgressCallback) {
+            updateProgressCallback(loadedCount, total, path, true);
+          }
+          if (loadedCount === total) {
+            resolve({ failed });
+          }
+        };
+        img.onerror = () => {
+          console.warn('Failed to preload image:', path);
+          failed.push(path);
+          loadedCount++;
+          if (updateProgressCallback) {
+            updateProgressCallback(loadedCount, total, path, false);
+          }
+          if (loadedCount === total) {
+            resolve({ failed });
+          }
+        };
+        img.src = path;
+      });
+    });
+  }
     const ss4State = getStates(4);
     const ss6State = getStates(6);
     // Precompute permutations for related size2 (4P2 = 12)
@@ -287,7 +408,14 @@
     return stimulusDict;
   }
 
-
+  /**
+   * Create a download link for the given JSON data and display it in the
+   * experiment container.  When clicked, the file will be saved to the
+   * user's machine.  Optionally triggers an automatic click to start the
+   * download immediately.
+   * @param {Object} data The data object to convert to JSON
+   * @param {string} filename Name of the file to download
+   */
   function createDownloadLink(data, filename) {
     const jsonStr = JSON.stringify(data, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -298,11 +426,15 @@
     link.textContent = 'Download results';
     link.style.display = 'block';
     link.style.marginTop = '20px';
-    link.click();
     document.getElementById('experiment').appendChild(link);
   }
 
-
+  /**
+   * Wait for the user to press one of the specified keys.  Returns a
+   * promise that resolves with the pressed key.
+   * @param {Array<string>} keys List of allowed key identifiers
+   * @returns {Promise<string>} Promise that resolves with the key pressed
+   */
   function waitForKey(keys) {
     return new Promise(resolve => {
       function handleKey(event) {
@@ -316,6 +448,11 @@
     });
   }
 
+  /**
+   * Pause execution for a specified duration.
+   * @param {number} ms Milliseconds to wait
+   * @returns {Promise<void>} Promise that resolves after the delay
+   */
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -374,7 +511,11 @@
     }
   };
 
-
+  /**
+   * Display the demographic form asking for participant number and age.
+   * Once the participant clicks start and the inputs are valid, the
+   * experiment proceeds to the instruction screens.
+   */
   function showDemographicForm() {
     const container = document.getElementById('experiment');
     container.innerHTML = '';
@@ -412,9 +553,26 @@
     container.appendChild(formDiv);
   }
 
-
+  /**
+   * Sequentially present the three instruction screens.  Each screen
+   * waits for the participant to press the Enter key before moving on.
+   * After the final screen, the main experiment trials begin.
+   */
   async function showInstructions() {
     const container = document.getElementById('experiment');
+    container.innerHTML = '';
+    // Before showing any instructions we preload all images.  This
+    // prevents network latency or caching issues from interrupting the
+    // presentation of stimuli during the experiment.  Display a
+    // temporary loading message while the images are being fetched.
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'loading';
+    loadingDiv.textContent = 'Loading images, please wait...';
+    container.appendChild(loadingDiv);
+    // Await completion of the preloader.  If desired you could
+    // implement a progress bar by passing a callback to preloadImages.
+    await preloadImages();
+    // Once preloading is complete, clear the loading message.
     container.innerHTML = '';
     // Instruction 1
     const instr1 = document.createElement('div');
@@ -422,20 +580,11 @@
     instr1.innerHTML = `This is a visual working memory task. This task will take approximately 30–40 minutes. You will have to remember the objects and report which one was shown in the previous set of objects as accurately as possible.<br><br>Press Enter to continue.`;
     container.appendChild(instr1);
     await waitForKey(['Enter', 'Return']);
-
     // Instruction 2 with image
     container.innerHTML = '';
     const instr2 = document.createElement('div');
     instr2.className = 'instructions';
-    instr2.innerHTML = `First, you will briefly see a set of objects. Please remember all of the objects.<br><br>Press Enter to continue.`;
-    instr2.style.position = 'absolute';
-    instr2.style.top = '50px';
-    instr2.style.left = '50%';
-    instr2.style.transform = 'translateX(-50%)';
-    instr2.style.textAlign = 'center';
-    instr2.style.width = '100%';
-    instr2.style.maxWidth = '800px';
-
+    instr2.innerHTML = `First, you will briefly see a set of objects. Please remember all of the objects.`;
     const img1 = document.createElement('img');
     img1.src = 'instr1.png';
     img1.style.maxWidth = '80%';
@@ -443,26 +592,17 @@
     img1.style.display = 'block';
     img1.style.margin = '20px auto';
     const prompt1 = document.createElement('div');
+    prompt1.textContent = 'Press Enter to continue';
     prompt1.style.marginTop = '20px';
     container.appendChild(instr2);
     container.appendChild(img1);
     container.appendChild(prompt1);
     await waitForKey(['Enter', 'Return']);
-    
     // Instruction 3 with second image
     container.innerHTML = '';
     const instr3 = document.createElement('div');
     instr3.className = 'instructions';
-    instr3.innerHTML = `Next, you will have to choose which object was shown in the previous set of objects.<br><br>Press Enter to start the task.`;
-    instr3.style.position = 'absolute';
-    instr3.style.top = '50px';
-    instr3.style.left = '50%';
-    instr3.style.transform = 'translateX(-50%)';
-    instr3.style.textAlign = 'center';
-    instr3.style.width = '100%';
-    instr3.style.maxWidth = '800px';
-
-    
+    instr3.innerHTML = `Next, you will have to choose which object was shown in the previous set of objects.`;
     const img2 = document.createElement('img');
     img2.src = 'instr2.png';
     img2.style.maxWidth = '80%';
@@ -470,6 +610,7 @@
     img2.style.display = 'block';
     img2.style.margin = '20px auto';
     const prompt2 = document.createElement('div');
+    prompt2.textContent = 'Press Enter to start the task';
     prompt2.style.marginTop = '20px';
     container.appendChild(instr3);
     container.appendChild(img2);
@@ -479,7 +620,16 @@
     await runTrials();
   }
 
-
+  /**
+   * Compute pixel positions for stimuli based on set size and randomised
+   * ordering.  The returned array contains objects with CSS percentage
+   * values for top and left so that elements can be positioned using
+   * absolute positioning.  This uses the same relative offsets as the
+   * PsychoPy script but scales them to the current viewport.
+   * @param {string} ss The set size (e.g. 'size2')
+   * @param {Array<number>} order Array of indices indicating the random order
+   * @returns {Array<{top: string, left: string}>} Positions for each stimulus
+   */
   function computePositions(ss, order) {
     const positions = [];
     const w = window.innerWidth;
@@ -516,7 +666,11 @@
     return positions;
   }
 
-
+  /**
+   * Compute positions for the 4AFC images.  Returns an array of CSS
+   * positions matching the four quadrants defined in the original code.
+   * @returns {Array<{top: string, left: string}>} Positions for the 4AFC
+   */
   function computeAfcPositions() {
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -533,13 +687,18 @@
     });
   }
 
-
+  /**
+   * Run through all trials sequentially.  For each trial a fixation cross
+   * is shown, then the stimuli are presented for the encoding duration,
+   * followed by another fixation and then a 4AFC response screen.  Results
+   * are recorded into the global `p` object.  When all trials complete
+   * the finish screen is displayed.
+   */
   async function runTrials() {
     const container = document.getElementById('experiment');
     // Precompute AFC positions once
     const afcPositions = computeAfcPositions();
-    for (let i = 0; i < 10; i++) {
-    // for (let i = 0; i < conditions.length; i++) {
+    for (let i = 0; i < conditions.length; i++) {
       const [ss, et, ctx, cat] = conditions[i];
       const id = randId[i];
       // Store trial metadata
@@ -549,7 +708,15 @@
       p.task.encoding_time.push(et);
       p.task.context.push(ctx);
       p.task.category.push(cat);
-      p.task.id.push(id);
+      // Instead of storing only the numeric id for each trial, we also
+      // record the actual stimulus categories used.  The stimCategory
+      // variable contains the category (or categories) associated with
+      // each stimulus in the current trial.  Storing this array allows
+      // downstream analyses to recover which categories were presented
+      // on each trial, especially in unrelated conditions where multiple
+      // categories can appear.  We push a shallow copy of the array to
+      // avoid unintended mutations when the original array is reused.
+      p.task.id.push(stimCategory.slice());
       // Determine chosen objects and states
       let chosenObj = [];
       let chosenState = [];
@@ -587,13 +754,7 @@
       container.appendChild(fix);
       await sleep(1000);
       // Phase 2: show stimuli
-
       container.innerHTML = '';
-      const fix3 = document.createElement('div');
-      fix3.className = 'fixation';
-      fix3.textContent = '+';
-      container.appendChild(fix3);
-
       const stimElems = [];
       for (let j = 0; j < nStim; j++) {
         const img = document.createElement('img');
@@ -669,10 +830,9 @@
         label.className = 'afc-label';
         label.textContent = `Press ${keyMap[pos]}`;
         label.style.left = afcPositions[pos].left;
-        
         // Place label slightly below the image
         const offsetY = parseFloat(afcPositions[pos].top);
-        label.style.top = `${offsetY + 20}%`;
+        label.style.top = `${offsetY + 6}%`;
         label.style.transform = 'translate(-50%, -50%)';
         container.appendChild(label);
         afcDivs.push({ img, label });
@@ -725,7 +885,12 @@
     finishExperiment(false);
   }
 
-
+  /**
+   * Display a thank you message and provide a download link for the data.
+   * Optionally skip the thank you if the experiment was aborted (e.g. via
+   * the Escape key).
+   * @param {boolean} aborted Whether the experiment ended prematurely
+   */
   function finishExperiment(aborted) {
     const container = document.getElementById('experiment');
     container.innerHTML = '';
@@ -739,6 +904,8 @@
     }
   }
 
+  // Initialise the experiment by showing the demographic form when the
+  // page loads.
   window.addEventListener('load', () => {
     showDemographicForm();
   });
