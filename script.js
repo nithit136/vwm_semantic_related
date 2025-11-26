@@ -735,7 +735,7 @@
       for (let j = 0; j < nStim; j++) {
         const img = document.createElement('img');
         img.className = 'stimulus-img';
-        img.src = `/Users/bank/Desktop/vwm/stimuli_folder/${ss}/${stimuliPaths[j]}.jpg`;
+        img.src = `stimuli_folder/${ss}/${stimuliPaths[j]}.jpg`;
         // Set size relative to number of stimuli
         let widthPerc = 20;
         if (ss === 'size2') widthPerc = 20;
