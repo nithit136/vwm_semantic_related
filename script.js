@@ -247,7 +247,7 @@
    * @param {Function} updateProgressCallback Optional progress callback
    * @returns {Promise<{failed: Array<string>}>} Resolves when all images are attempted
    */
-  function preloadImages(updateProgressCallback) {
+  function preloadImages() {
     const paths = buildAllImagePaths();
     const total = paths.length;
     let loadedCount = 0;
