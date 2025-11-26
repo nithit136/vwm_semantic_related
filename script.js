@@ -1,5 +1,35 @@
-(() => {
+/*
+ * script.js
+ *
+ * This file contains the logic necessary to run the Visual Working Memory
+ * experiment entirely within a web browser.  It mirrors the structure of the
+ * provided PsychoPy code but is written in plain JavaScript and uses the DOM
+ * to present stimuli and collect responses.  The experiment flows through the
+ * following phases:
+ *   1) Collect participant information via a simple form.
+ *   2) Present instructions across three screens, advancing on Enter.
+ *   3) For each of the 360 trials, display a fixation cross, a set of
+ *      coloured object stimuli at variable positions for a specified encoding
+ *      duration, a second fixation, and finally a four-alternative forced
+ *      choice (4AFC) response screen.
+ *   4) Record responses, reaction times, and accuracy.
+ *   5) Save the resulting data as a downloadable JSON file and thank the
+ *      participant.
+ *
+ * To use your own images, create a folder called `stimuli_folder` in the
+ * experiment directory containing subfolders named `size2`, `size4` and
+ * `size6`.  Within each size folder create subfolders for each category
+ * (e.g. `cat_1`, `cat_2`, ..., `cat_10`) and place your image files there
+ * using the naming convention `objX_sY.jpg` (e.g. `obj1_s1.jpg`).  Two
+ * instruction images named `instr1.png` and `instr2.png` should also be
+ * placed in the experiment directory.
+ */
 
+(() => {
+  // Cache object used by the image preloader.  Each key is an image
+  // path and the corresponding value is a loaded Image object.  By
+  // storing references here, the browser keeps the resources in
+  // memory, avoiding additional network requests during the task.
   const IMAGE_CACHE = {};
   // Helper functions for randomisation and combinatorial logic
   /**
@@ -119,7 +149,31 @@
     return afcCat;
   }
 
-
+  /**
+   * Precompute all stimuli and associated metadata for each set size,
+   * context and category.  This mirrors the logic in the original PsychoPy
+   * script.  The resulting structure is stored on the global `stimulusDict`
+   * variable for later lookup.
+   *
+   * stimulusDict has the following structure:
+   * {
+   *   size2: {
+   *     related: {
+   *       cat_1: {
+   *         category: [[cat_1, cat_1], ..., 12 entries],
+   *         stimulus: [[obj1, obj2], ..., 12 entries],
+   *         state: [[s1, s2], ..., 12 entries],
+   *         afc_cat: [[cat_1, foil], ..., 12 entries],
+   *         afc_stim: [[objA, objB], ..., 12 entries]
+   *       },
+   *       ...
+   *     },
+   *     unrelated: { ... },
+   *   },
+   *   size4: { ... },
+   *   size6: { ... }
+   * }
+   */
   function buildStimulusDict() {
     const stimulusDict = {};
     // General parameters
@@ -148,7 +202,9 @@
    */
   function buildAllImagePaths() {
     const paths = [];
-
+    // Define set sizes and corresponding objects; this mirrors the
+    // structure used when computing the stimulus dictionary.  Note that
+    // size4 uses the same objects as size2 in this particular task.
     const setSizes = ['size2', 'size4', 'size6'];
     const objectsBySet = {
       size2: ['obj1', 'obj2', 'obj3', 'obj4'],
@@ -169,14 +225,24 @@
         });
       });
     });
-
+    // Also include the instruction images which are referenced in the
+    // instruction screens.  These files should live alongside index.html.
     paths.push('instr1.png');
     paths.push('instr2.png');
     return paths;
   }
 
   /**
-
+   * Preload all experiment images before the task begins.  Given a list
+   * of image paths, this function creates Image objects, assigns each
+   * path to the src attribute, and resolves a promise when all images
+   * have either loaded or failed.  Successfully loaded images are
+   * stored on the IMAGE_CACHE object for potential later reuse.
+   *
+   * An optional callback can be supplied to monitor progress.  It is
+   * invoked with (loadedCount, totalCount, path, success) each time an
+   * image finishes loading (or fails).  This can be used to update a
+   * progress indicator on screen if desired.
    *
    * @param {Function} updateProgressCallback Optional progress callback
    * @returns {Promise<{failed: Array<string>}>} Resolves when all images are attempted
@@ -406,6 +472,97 @@
       }
     }
     return stimulusDict;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Preloading utilities
+  // The following functions are defined outside of buildStimulusDict so they
+  // can be referenced from elsewhere in the script (e.g. showInstructions).
+  // Duplicate definitions exist inside buildStimulusDict for legacy reasons,
+  // but those are scoped locally and do not affect the global behaviour.
+
+  /**
+   * Build a flat list of all image paths used in the experiment.  This
+   * includes every possible stimulus image (across all set sizes,
+   * categories, objects and states) as well as the instruction images.
+   * These paths are used by the image preloader so that every image can
+   * be fetched and cached before the experiment starts.  Having images
+   * loaded up front avoids missing or delayed stimuli when trials run.
+   *
+   * @returns {Array<string>} List of relative image paths
+   */
+  function buildAllImagePaths() {
+    const paths = [];
+    const setSizes = ['size2', 'size4', 'size6'];
+    const objectsBySet = {
+      size2: ['obj1', 'obj2', 'obj3', 'obj4'],
+      size4: ['obj1', 'obj2', 'obj3', 'obj4'],
+      size6: ['obj1', 'obj2', 'obj3', 'obj4', 'obj5', 'obj6']
+    };
+    const states = ['s1', 's2'];
+    setSizes.forEach(ss => {
+      const objs = objectsBySet[ss];
+      categoriesList.forEach(cat => {
+        objs.forEach(obj => {
+          states.forEach(st => {
+            const relPath = `stimuli_folder/${ss}/${cat}/${obj}_${st}.jpg`;
+            paths.push(relPath);
+          });
+        });
+      });
+    });
+    paths.push('instr1.png');
+    paths.push('instr2.png');
+    return paths;
+  }
+
+  /**
+   * Preload all experiment images before the task begins.  Given a list
+   * of image paths, this function creates Image objects, assigns each
+   * path to the src attribute, and resolves a promise when all images
+   * have either loaded or failed.  Successfully loaded images are
+   * stored on the IMAGE_CACHE object for potential later reuse.
+   *
+   * An optional callback can be supplied to monitor progress.  It is
+   * invoked with (loadedCount, totalCount, path, success) each time an
+   * image finishes loading (or fails).  This can be used to update a
+   * progress indicator on screen if desired.
+   *
+   * @param {Function} updateProgressCallback Optional progress callback
+   * @returns {Promise<{failed: Array<string>}>} Resolves when all images are attempted
+   */
+  function preloadImages(updateProgressCallback) {
+    const paths = buildAllImagePaths();
+    const total = paths.length;
+    let loadedCount = 0;
+    const failed = [];
+    return new Promise(resolve => {
+      paths.forEach(path => {
+        const img = new Image();
+        img.onload = () => {
+          IMAGE_CACHE[path] = img;
+          loadedCount++;
+          if (updateProgressCallback) {
+            updateProgressCallback(loadedCount, total, path, true);
+          }
+          if (loadedCount === total) {
+            resolve({ failed });
+          }
+        };
+        img.onerror = () => {
+          console.warn('Failed to preload image:', path);
+          failed.push(path);
+          loadedCount++;
+          if (updateProgressCallback) {
+            updateProgressCallback(loadedCount, total, path, false);
+          }
+          if (loadedCount === total) {
+            resolve({ failed });
+          }
+        };
+        img.src = path;
+      });
+    });
   }
 
   /**
