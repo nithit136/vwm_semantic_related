@@ -554,7 +554,7 @@
     instr2.style.maxWidth = '800px';
 
     const img1 = document.createElement('img');
-    img1.src = '/Users/bank/Desktop/vwm/vwm_task_bank/instr1.png';
+    img1.src = 'instr1.png';
     img1.style.maxWidth = '80%';
     img1.style.height = 'auto';
     img1.style.display = 'block';
@@ -581,7 +581,7 @@
 
     
     const img2 = document.createElement('img');
-    img2.src = '/Users/bank/Desktop/vwm/vwm_task_bank/instr2.png';
+    img2.src = 'instr2.png';
     img2.style.maxWidth = '80%';
     img2.style.height = 'auto';
     img2.style.display = 'block';
@@ -792,7 +792,7 @@
       const afcDivs = [];
       for (let pos = 0; pos < 4; pos++) {
         const stimType = afcOrder[pos];
-        const stimPath = `/Users/bank/Desktop/vwm/stimuli_folder/${ss}/${afcStimuli[stimType]}.jpg`;
+        const stimPath = `stimuli_folder/${ss}/${afcStimuli[stimType]}.jpg`;
         // Image
         const img = document.createElement('img');
         img.className = 'afc-img';
