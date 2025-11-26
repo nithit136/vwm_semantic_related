@@ -377,6 +377,89 @@
     return stimulusDict;
   }
 
+  function buildAllImagePaths() {
+    const paths = [];
+    // Define set sizes and corresponding objects; this mirrors the
+    // structure used when computing the stimulus dictionary.  Note that
+    // size4 uses the same objects as size2 in this particular task.
+    const setSizes = ['size2', 'size4', 'size6'];
+    const objectsBySet = {
+      size2: ['obj1', 'obj2', 'obj3', 'obj4'],
+      size4: ['obj1', 'obj2', 'obj3', 'obj4'],
+      size6: ['obj1', 'obj2', 'obj3', 'obj4', 'obj5', 'obj6']
+    };
+    const states = ['s1', 's2'];
+    // Use the global categoriesList defined below.  This ensures that
+    // modifications to the category list propagate to the preloader.
+    setSizes.forEach(ss => {
+      const objs = objectsBySet[ss];
+      categoriesList.forEach(cat => {
+        objs.forEach(obj => {
+          states.forEach(st => {
+            const relPath = `stimuli_folder/${ss}/${cat}/${obj}_${st}.jpg`;
+            paths.push(relPath);
+          });
+        });
+      });
+    });
+    // Also include the instruction images which are referenced in the
+    // instruction screens.  These files should live alongside index.html.
+    paths.push('instr1.png');
+    paths.push('instr2.png');
+    return paths;
+  }
+
+  /**
+   * Preload all experiment images before the task begins.  Given a list
+   * of image paths, this function creates Image objects, assigns each
+   * path to the src attribute, and resolves a promise when all images
+   * have either loaded or failed.  Successfully loaded images are
+   * stored on the IMAGE_CACHE object for potential later reuse.
+   *
+   * An optional callback can be supplied to monitor progress.  It is
+   * invoked with (loadedCount, totalCount, path, success) each time an
+   * image finishes loading (or fails).  This can be used to update a
+   * progress indicator on screen if desired.
+   *
+   * @param {Function} updateProgressCallback Optional progress callback
+   * @returns {Promise<{failed: Array<string>}>} Resolves when all images are attempted
+   */
+  function preloadImages() {
+    const paths = buildAllImagePaths();
+    const total = paths.length;
+    let loadedCount = 0;
+    const failed = [];
+    return new Promise(resolve => {
+      paths.forEach(path => {
+        const img = new Image();
+        img.onload = () => {
+          // Cache the image using the relative path as key
+          IMAGE_CACHE[path] = img;
+          loadedCount++;
+          if (updateProgressCallback) {
+            updateProgressCallback(loadedCount, total, path, true);
+          }
+          if (loadedCount === total) {
+            resolve({ failed });
+          }
+        };
+        img.onerror = () => {
+          console.warn('Failed to preload image:', path);
+          failed.push(path);
+          loadedCount++;
+          if (updateProgressCallback) {
+            updateProgressCallback(loadedCount, total, path, false);
+          }
+          if (loadedCount === total) {
+            resolve({ failed });
+          }
+        };
+        img.src = path;
+      });
+    });
+  }
+
+
   /**
    * Create a download link for the given JSON data and display it in the
    * experiment container.  When clicked, the file will be saved to the
